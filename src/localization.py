@@ -11,9 +11,6 @@ from nav_msgs.srv import GetMap
 from nav_msgs.msg import OccupancyGrid
 
 import numpy as np
-import matplotlib.pyplot as plt
-
-import numpy as np
 
 import copy
 import time
@@ -29,11 +26,27 @@ def getMap() -> OccupancyGrid:
     recMap = recMap.map
     # Return
     return recMap
-
+    
 # Initiate ROS node
 rospy.init_node('localization')
 
 # Wait until the node exists else it will throw an error
 rospy.wait_for_service('static_map')
 
+# Get the map
 recMap = getMap()
+
+# Deserialise into a 2D array
+mapData = np.split(np.array(recMap.data), recMap.info.height)
+
+# Visualize the map into the console
+for row in mapData:
+    rowStr = ""
+    for col in row:
+        if col == 0:
+            rowStr += " "
+        elif col == 100:
+            rowStr += "#"
+        else:
+            rowStr += "?"
+    print(rowStr)
