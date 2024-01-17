@@ -10,6 +10,8 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.srv import GetMap
 from nav_msgs.msg import OccupancyGrid
 
+import matplotlib.pyplot as plt
+
 import numpy as np
 
 import copy
@@ -26,6 +28,61 @@ def getMap() -> OccupancyGrid:
     recMap = recMap.map
     # Return
     return recMap
+
+# Helper method to show the map
+def showMap(data):
+    """ Displays map """
+    # Store colours matching UAS TW colour scheme as dict 
+    colourScheme = {
+        "darkblue": "#143049",
+        "twblue": "#00649C",
+        "lightblue": "#8DA3B3",
+        "lightgrey": "#CBC0D5",
+        "twgrey": "#72777A"
+    }
+
+    ## Visualise transformed maze and scans
+    # Create single figure
+    plt.rcParams['figure.figsize'] = [7, 7]
+    fig, ax = plt.subplots()
+
+    # Get data into wallPosition and freePosition arrays
+    wallPositions = np.array([])
+    freePositions = np.array([])
+    for i in range(len(data)):
+        for j in range(len(data[i])):
+            if data[i][j] == 100:
+                wallPositions = np.append(wallPositions, [i, j])
+            elif data[i][j] == 0:
+                freePositions = np.append(freePositions, [i, j])
+
+    # Reshape arrays to be 2D
+    wallPositions = np.reshape(wallPositions, (-1, 2))
+    freePositions = np.reshape(freePositions, (-1, 2))
+
+    # Plot data as points (=scatterplot) and label accordingly. The colours are to look nice with UAS TW colours
+    ax.scatter(wallPositions[:,1], wallPositions[:,0], c=colourScheme["darkblue"], alpha=1.0, s=6**2, label="Walls")
+    ax.scatter(freePositions[:,1], freePositions[:,0], c=colourScheme["twgrey"], alpha=0.08, s=6**2, label="Unobstructed Space")
+    ax.scatter([0], [0], c=colourScheme["twblue"], s=15**2, label="Scan Center")
+
+    # Set axes labels and figure title
+    ax.set_xlabel("X-Coordinate [m]")
+    ax.set_ylabel("Y-Coordinate [m]")
+    ax.set_title("Map and Laserscan Data Transformed into World Coordinates")
+
+    # Set grid to only plot each metre
+    ax.set_xticks = [-1, 0, 1, 2, 3, 4 ]
+    ax.set_yticks = [-1, 0, 1, 2, 3, 4 ]
+
+    # Move grid behind points
+    ax.set_axisbelow(True)
+    ax.grid()
+
+    # Add labels
+    ax.legend()
+
+    # Show plot
+    plt.show()
     
 # Initiate ROS node
 rospy.init_node('localization')
@@ -39,14 +96,5 @@ recMap = getMap()
 # Deserialise into a 2D array
 mapData = np.split(np.array(recMap.data), recMap.info.height)
 
-# Visualize the map into the console
-for row in mapData:
-    rowStr = ""
-    for col in row:
-        if col == 0:
-            rowStr += " "
-        elif col == 100:
-            rowStr += "#"
-        else:
-            rowStr += "?"
-    print(rowStr)
+# Show the map
+showMap(mapData)
