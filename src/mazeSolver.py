@@ -14,14 +14,9 @@ import copy
 import time
 import math
 
+from mapVisualisation import MapVisualisation
+
 ALLOW_VISUALISATION = True
-COULOUR_SCHEME = {
-    "darkblue": "#143049",
-    "twblue": "#00649C",
-    "lightblue": "#8DA3B3",
-    "lightgrey": "#CBC0D5",
-    "twgrey": "#72777A"
-}
 
 def getMap() -> OccupancyGrid:
     """ Loads map from map service """
@@ -33,117 +28,13 @@ def getMap() -> OccupancyGrid:
     # Return
     return recMap
 
-def showMap(freePositions, wallPositions, scanPositions):
-    plt.rcParams['figure.figsize'] = [7, 7]
-    fig, ax = plt.subplots()
-    ax.scatter(scanPositions[:,1], scanPositions[:,0], c="r", alpha=0.8, label="Laserscan")
-    ax.scatter(wallPositions[:,1], wallPositions[:,0], c=COULOUR_SCHEME["darkblue"], alpha=1.0, s=6**2, label="Walls")
-    ax.scatter(freePositions[:,1], freePositions[:,0], c=COULOUR_SCHEME["twgrey"], alpha=0.08, s=6**2, label="Unobstructed Space")
-    ax.scatter([0], [0], c=COULOUR_SCHEME["twblue"], s=15**2, label="Scan Center")
-    ax.set_xlabel("X-Coordinate [m]")
-    ax.set_ylabel("Y-Coordinate [m]")
-    ax.set_title("Map and Laserscan Data Transformed into World Coordinates")
-    ax.set_xticks = [-1, 0, 1, 2, 3, 4 ]
-    ax.set_yticks = [-1, 0, 1, 2, 3, 4 ]
-    ax.set_axisbelow(True)
-    ax.grid()
-    ax.legend()
-    plt.show()
-
-def visualiseClf(clf, X):
-    plt.rcParams['figure.figsize'] = [5, 5]
-    _, ax = plt.subplots()
-    DecisionBoundaryDisplay.from_estimator(
-        clf,
-        X,
-        cmap=ListedColormap(
-            [
-                COULOUR_SCHEME["twgrey"],
-                COULOUR_SCHEME["darkblue"]
-            ]
-        ),
-        ax=ax,
-        response_method="predict",
-        plot_method="pcolormesh",
-        xlabel="X-Coordinate[m]",
-        ylabel="Y-Coordinate[m]",
-        shading="auto",
-    )
-    ax.set_title("Fitted kNN Model representing the Map")
-    plt.show()
-
-def showMapWithAllPaths(wallPositions, nodesPositions, robotPosition, graph):
-    plt.rcParams['figure.figsize'] = [7, 7]
-    fig, ax = plt.subplots()
-    edgeLines = np.array(
-        [
-            [
-                edge["parent"],
-                edge["child"]
-            ] for edge in graph
-        ]
-    )
-    ax.scatter(wallPositions[:,1], wallPositions[:,0], c=COULOUR_SCHEME["darkblue"], alpha=1.0, s=6**2, label="Walls")
-    ax.scatter(nodesPositions[:,1], nodesPositions[:,0], c=COULOUR_SCHEME["twblue"], alpha=1.0, s=8**2, label="Graph")
-    ax.scatter([robotPosition[1]], [robotPosition[0]], c=COULOUR_SCHEME["twblue"], s=15**2, label="Robot Position")
-    for line in edgeLines:
-        x0, y0 = line[0]
-        x1, y1 = line[1]
-        x = [x0, x1]
-        y = [y0, y1]
-        ax.plot(y, x, c=COULOUR_SCHEME["twblue"])
-    ax.set_xlabel("X-Coordinate [m]")
-    ax.set_ylabel("Y-Coordinate [m]")
-    ax.set_title("Graph Generated based on Map Data")
-    ax.set_xticks = [-1, 0, 1, 2, 3, 4 ]
-    ax.set_yticks = [-1, 0, 1, 2, 3, 4 ]
-    ax.set_axisbelow(True)
-    ax.grid()
-    ax.legend()
-    plt.show()
-
-def showMapWithMainPath(wallPositions, nodesPositions, robotPosition, scan, path):
-    plt.rcParams['figure.figsize'] = [7, 7]
-    fig, ax = plt.subplots()
-    scan = np.array(bestPose) + scanPositions
-    edgeLines = np.array(
-        [
-            [
-                path[index-1],
-                path[index]
-            ] for index in range(1, len(path))
-        ]
-    )
-    ax.scatter(wallPositions[:,1], wallPositions[:,0], c=COULOUR_SCHEME["darkblue"], alpha=1.0, s=6**2, label="Walls")
-    ax.scatter(nodesPositions[:,0], nodesPositions[:,1], c=COULOUR_SCHEME["twblue"], alpha=1.0, s=8**2, label="Path")
-    ax.scatter([robotPosition[1]], [robotPosition[0]], c=COULOUR_SCHEME["twblue"], s=15**2, label="Robot Position")
-    ax.scatter(scan[:,1], scan[:,0], c="r", alpha=0.8, label="Laserscan")
-    for line in edgeLines:
-        x0, y0 = line[0]
-        x1, y1 = line[1]
-        x = [x0, x1]
-        y = [y0, y1]
-        ax.plot(y, x, c=COULOUR_SCHEME["twblue"])
-    ax.set_xlabel("X-Coordinate [m]")
-    ax.set_ylabel("Y-Coordinate [m]")
-    ax.set_title("Found Path from Robot Position to Exit")
-    ax.set_xticks = [-1, 0, 1, 2, 3, 4 ]
-    ax.set_yticks = [-1, 0, 1, 2, 3, 4 ]
-    ax.set_axisbelow(True)
-    ax.grid()
-    ax.legend()
-    plt.show()
-
-# ----------------------------------------------------------------
-
-# Initiate ROS node
-rospy.init_node('localisation')
+rospy.init_node('mazeSolver')
 
 # ----------------------------------
 # Step 1: Get map and laserscan data
 # ----------------------------------
 
-# Wait until the node exists else it will throw an error
+# Wait until the node exists else it will throw an error for some reason
 rospy.wait_for_service('static_map')
 
 # Get the map
@@ -193,7 +84,7 @@ scanPositions = np.reshape(scanPositions, (-1, 2))
 
 # Show the map of the scan
 if ALLOW_VISUALISATION:
-    showMap(freePositions, wallPositions, scanPositions)
+    MapVisualisation.showMap(freePositions, wallPositions, scanPositions)
 
 # ---------------------------------
 # Step 2: Localisation using kNN
@@ -211,7 +102,7 @@ clf = knn.fit(X, Y)
 
 # Visualise the model
 if ALLOW_VISUALISATION: 
-    visualiseClf(clf, X)
+    MapVisualisation.visualiseClf(clf, X)
 
 # Define all possible poses (positions where no walls and coordinates that are whole numbers)
 poses = []
@@ -281,7 +172,7 @@ for node in nodes:
             edges = np.append(edges, {"parent": node, "child": neighbour})
 
 if ALLOW_VISUALISATION:
-    showMapWithAllPaths(wallPositions, nodes, bestPose, edges)
+    MapVisualisation.showMapWithAllPaths(wallPositions, nodes, bestPose, edges)
 
 # custom dfs recursive implementation
 discoveredNodes = []
@@ -324,4 +215,4 @@ print("Path found:", path)
 
 # Show the map with the path
 if ALLOW_VISUALISATION:
-    showMapWithMainPath(wallPositions, nodes, bestPose, scanPositions, path)
+    MapVisualisation.showMapWithMainPath(wallPositions, nodes, bestPose, scanPositions, path)
