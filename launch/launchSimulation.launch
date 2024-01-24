@@ -42,7 +42,7 @@
     <rosparam file="$(find turtlebot3_navigation)/param/dwa_local_planner_params_$(arg model).yaml" command="load" />
   </node>
 
-  <node pkg="soar_maze_escape" type="localization.py" name="localization" output="screen" />
+  <node pkg="soar_maze_escape" type="localisation.py" name="localisation" output="screen" />
 
   <!--node pkg="amcl" type="amcl" name="amcl">
     <param name="min_particles"             value="500"/>
