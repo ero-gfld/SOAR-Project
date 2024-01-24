@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-
 import rospy
 from sensor_msgs.msg import LaserScan
 from nav_msgs.srv import GetMap
 from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import PoseStamped
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from sklearn.inspection import DecisionBoundaryDisplay
@@ -17,6 +17,8 @@ import math
 from mapVisualisation import MapVisualisation
 
 ALLOW_VISUALISATION = True
+TIME_BETWEEN_PUBLISH = 10
+GOAL = [3, 3]
 
 def getMap() -> OccupancyGrid:
     """ Loads map from map service """
@@ -116,6 +118,9 @@ allPredictions = {}
 for pose in poses:
     # Transform the laserscan to the current pose
     transformedScan = scanPositions + pose
+
+    # Remove all inf values else the model will throw an error
+    transformedScan = transformedScan[~np.isinf(transformedScan).any(axis=1)]
     
     # Predict the values using the fitted model
     predictions = clf.predict(transformedScan)
@@ -178,7 +183,7 @@ if ALLOW_VISUALISATION:
 discoveredNodes = []
 reversePath = []
 currentNode = bestPose
-goal = [0, 0]
+goal = GOAL
 def MyDFS(currentNode):
     # Add current node to discovered nodes
     print("|_ Entering on node", currentNode)
@@ -200,9 +205,6 @@ def MyDFS(currentNode):
                 continue
             # ...else we found the goal and we add the current node to the path
             reversePath.append(child)
-            # If the current node is the initial node, we add it to the path
-            if currentNode == bestPose:
-                reversePath.append(currentNode)
             return True
     return False
 
@@ -216,3 +218,36 @@ print("Path found:", path)
 # Show the map with the path
 if ALLOW_VISUALISATION:
     MapVisualisation.showMapWithMainPath(wallPositions, nodes, bestPose, scanPositions, path)
+
+# ---------------------------------
+# Step 4: Publishing to ROS
+# ---------------------------------
+
+def callback(data):
+    print(data.status_list[0].status)
+
+# Create publisher
+pathPublisher = rospy.Publisher('move_base_simple/goal', PoseStamped, queue_size=10)
+
+# Create pose message
+poseMsg = PoseStamped()
+poseMsg.header.stamp = rospy.Time.now()
+poseMsg.header.frame_id = "map"
+poseMsg.pose.orientation.x = 0.0
+poseMsg.pose.orientation.y = 0.0
+poseMsg.pose.orientation.z = 0.0
+poseMsg.pose.orientation.w = 1.0
+
+# Wait the publisher
+time.sleep(1)
+
+# Iterate over all nodes in the path
+for node in path:
+    # Set the pose
+    poseMsg.pose.position.x = float(node[1])
+    poseMsg.pose.position.y = float(node[0])
+    poseMsg.pose.position.z = 0.0
+    # Publish the path
+    pathPublisher.publish(poseMsg)
+    # Wait for the robot to reach the pose
+    time.sleep(TIME_BETWEEN_PUBLISH)
